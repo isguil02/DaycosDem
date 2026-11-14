@@ -1,0 +1,13 @@
+# Study & AI notes
+AI-Tutor
+notes.md
+.antigravity/
+
+# Secrets & local environment
+.env
+
+# .NET / Node / Python build artifacts
+bin/
+obj/
+node_modules/
+__pycache__/
