@@ -2,12 +2,22 @@ using Npgsql;
 
 var builder = WebApplication.CreateBuilder(args);
 
+
 // Read the connection string from appsettings.json
 var connectionString = builder.Configuration.GetConnectionString("DefaultConnection");
+// Allow our Svelte frontend to talk to this backend
+builder.Services.AddCors(options =>
+{
+    options.AddDefaultPolicy(policy =>
+    {
+        policy.AllowAnyOrigin().AllowAnyHeader().AllowAnyMethod();
+    });
+});
 
 var app = builder.Build();
 
 app.UseHttpsRedirection();
+app.UseCors();
 
 // GET /invoices: Pulls live from PostgreSQL and runs duplicate audit
 app.MapGet("/invoices", async () =>
@@ -60,6 +70,11 @@ app.MapPost("/invoices", async (CreateInvoiceRequest request) =>
     if (request.Amount <= 0)
     {
         return Results.BadRequest("Invoice amount must be greater than zero.");
+    }
+    // Daycos Rule: Money cannot have fractional cents (> 2 decimals)
+    if (decimal.Round(request.Amount, 2) != request.Amount)
+    {
+        return Results.BadRequest("Invoice amount cannot have more than 2 decimal places (e.g. $10.50).");
     }
     if (request.WeightLbs <= 0)
     {
