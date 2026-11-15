@@ -45,7 +45,7 @@ app.MapGet("/invoices", async () =>
 
     foreach (var inv in sortedInvoices)
     {
-        bool isDuplicate = !seen.Add(inv.InvoiceNumber);
+        bool isDuplicate = !seen.Add($"{inv.CarrierName}:{inv.InvoiceNumber}"); //Added carrier name to ensure 2 companies with a matching invoice number don't get marked as duplicate
         auditedInvoices.Add(inv with { IsDuplicate = isDuplicate });
     }
 
