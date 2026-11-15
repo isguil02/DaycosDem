@@ -10,7 +10,7 @@ Content-Type: application/json
 
 {
   "invoiceNumber": "INV-1004",
-  "carrierName": "North American Van Lines",
+  "carrierName": "North American Van Lines2",
   "createdAt": "2026-11-14T21:30:00Z",
   "weightLbs": 9200.00,
   "amount": 3450.00,
@@ -27,5 +27,17 @@ Content-Type: application/json
   "createdAt": "2026-11-14T21:30:00Z",
   "weightLbs": 1000.00,
   "amount": -50.00,
+  "isDuplicate": false
+}
+
+### Submit invoice with NO date (Server auto-fills it!)
+POST {{backend_HostAddress}}/invoices/
+Content-Type: application/json
+
+{
+  "invoiceNumber": "INV-1005",
+  "carrierName": "FedEx Freight",
+  "weightLbs": 4500.00,
+  "amount": 1650.00,
   "isDuplicate": false
 }
