@@ -1,55 +1,126 @@
-using System.Security.Authentication.ExtendedProtection;
+using Npgsql;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// Add services to the container.
+// Read the connection string from appsettings.json
+var connectionString = builder.Configuration.GetConnectionString("DefaultConnection");
 
 var app = builder.Build();
 
-// Configure the HTTP request pipeline.
-
 app.UseHttpsRedirection();
 
-//Create First Sample List
-var invoices = new List<Invoice>
+// GET /invoices: Pulls live from PostgreSQL and runs duplicate audit
+app.MapGet("/invoices", async () =>
 {
-    new("INV-1001", "Allied Van Lines", DateTimeOffset.UtcNow.AddHours(-2), 7500.00m, 2450.50m, false),
-    new("INV-1002", "Atlas World Group", DateTimeOffset.UtcNow.AddHours(-1), 12400.00m, 4120.00m, false),
-    new("INV-1001", "Allied Van Brah", DateTimeOffset.UtcNow.AddHours(-3), 7500.00m, 2450.50m, false)
-};
-//The get call to get all the items from Invoices and displaying them on the locahost
-app.MapGet("/invoices", () =>
-{
-    var seen = new HashSet<string>(); //Used hash to make computing efficent 
-    var auditedInvoices = new List<Invoice>();
-    var sortedInvoices = invoices.OrderBy(inv => inv.CreatedAt); //Sorted to ensure no original is marked as the duplicate
+    var dbInvoices = new List<Invoice>();
 
-    foreach (var inv in sortedInvoices) //Test if each item is a duplicate by adding the ID to seen if the ID is in seen then its marked as a duplicate
+    await using var conn = new NpgsqlConnection(connectionString);
+    await conn.OpenAsync();
+
+    var sql = """
+        SELECT i.invoice_number, c.name, i.created_at, i.weight_lbs, i.amount
+        FROM invoices i
+        INNER JOIN carriers c ON i.carrier_id = c.id;
+    """;
+
+    await using var cmd = new NpgsqlCommand(sql, conn);
+    await using var reader = await cmd.ExecuteReaderAsync();
+
+    while (await reader.ReadAsync())
     {
-        bool IsDuplicate = !seen.Add(inv.InvoiceNumber);
-        auditedInvoices.Add(inv with { IsDuplicate = IsDuplicate });
+        dbInvoices.Add(new Invoice(
+            reader.GetString(0),                     // invoice_number
+            reader.GetString(1),                     // carrier name (from carriers table!)
+            reader.GetFieldValue<DateTimeOffset>(2), // created_at (UTC)
+            reader.GetDecimal(3),                    // weight_lbs
+            reader.GetDecimal(4),                    // amount
+            false                                    // isDuplicate (audited below)
+        ));
     }
 
-    return auditedInvoices; //Returns the duplicated invoices to update to the list
+    // Run our duplicate detection engine on the live database records
+    var seen = new HashSet<string>();
+    var auditedInvoices = new List<Invoice>();
+    var sortedInvoices = dbInvoices.OrderBy(inv => inv.CreatedAt);
+
+    foreach (var inv in sortedInvoices)
+    {
+        bool isDuplicate = !seen.Add(inv.InvoiceNumber);
+        auditedInvoices.Add(inv with { IsDuplicate = isDuplicate });
+    }
+
+    return Results.Ok(auditedInvoices);
 });
 
-app.MapPost("/invoices", (Invoice newInvoice) =>
+
+// POST /invoices: Saves a new invoice into PostgreSQL
+app.MapPost("/invoices", async (CreateInvoiceRequest request) =>
 {
-    // Step 1: Validate input
-    if (newInvoice.Amount <= 0)
+    // 1. Validation
+    if (request.Amount <= 0)
     {
         return Results.BadRequest("Invoice amount must be greater than zero.");
     }
+    if (request.WeightLbs <= 0)
+    {
+        return Results.BadRequest("Weight must be greater than zero.");
+    }
 
-    // Step 2: Add to list
-    invoices.Add(newInvoice with { CreatedAt = DateTimeOffset.UtcNow });
-    // Step 3: Return 201 Created
-    return Results.Created($"/invoices/{newInvoice.InvoiceNumber}", newInvoice);
+    await using var conn = new NpgsqlConnection(connectionString);
+    await conn.OpenAsync();
+
+    // 2. Find carrier ID or create new carrier if it doesn't exist yet
+    int carrierId;
+    await using var findCmd = new NpgsqlCommand("SELECT id FROM carriers WHERE name = @name", conn);
+    findCmd.Parameters.AddWithValue("name", request.CarrierName);
+    var existingId = await findCmd.ExecuteScalarAsync();
+
+    if (existingId != null)
+    {
+        carrierId = (int)existingId;
+    }
+    else
+    {
+        var code = Guid.NewGuid().ToString("N")[..4].ToUpper(); // 4-char unique code
+        await using var insertCarrierCmd = new NpgsqlCommand(
+            "INSERT INTO carriers (name, carrier_code) VALUES (@name, @code) RETURNING id", conn);
+        insertCarrierCmd.Parameters.AddWithValue("name", request.CarrierName);
+        insertCarrierCmd.Parameters.AddWithValue("code", code);
+        carrierId = (int)(await insertCarrierCmd.ExecuteScalarAsync())!;
+    }
+
+    // 3. Insert invoice linked to that carrier_id (SQL-injection safe parameters)
+    var insertSql = """
+        INSERT INTO invoices (carrier_id, invoice_number, weight_lbs, amount)
+        VALUES (@carrierId, @invoiceNumber, @weightLbs, @amount)
+        RETURNING id, created_at;
+    """;
+
+    await using var cmd = new NpgsqlCommand(insertSql, conn);
+    cmd.Parameters.AddWithValue("carrierId", carrierId);
+    cmd.Parameters.AddWithValue("invoiceNumber", request.InvoiceNumber);
+    cmd.Parameters.AddWithValue("weightLbs", request.WeightLbs);
+    cmd.Parameters.AddWithValue("amount", request.Amount);
+
+    await using var reader = await cmd.ExecuteReaderAsync();
+    await reader.ReadAsync();
+
+    var newId = reader.GetInt32(0);
+    var createdAt = reader.GetFieldValue<DateTimeOffset>(1);
+
+    // 4. Return 201 Created
+    return Results.Created($"/invoices/{request.InvoiceNumber}", new
+    {
+        Id = newId,
+        request.InvoiceNumber,
+        request.CarrierName,
+        request.WeightLbs,
+        request.Amount,
+        CreatedAt = createdAt
+    });
 });
 
-
 app.Run();
-
 
 public record Invoice(
     string InvoiceNumber,
@@ -58,4 +129,12 @@ public record Invoice(
     decimal WeightLbs,
     decimal Amount,
     bool IsDuplicate
+);
+
+
+public record CreateInvoiceRequest(
+    string InvoiceNumber,
+    string CarrierName,
+    decimal WeightLbs,
+    decimal Amount
 );

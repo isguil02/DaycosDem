@@ -10,8 +10,7 @@ Content-Type: application/json
 
 {
   "invoiceNumber": "INV-1004",
-  "carrierName": "North American Van Lines2",
-  "createdAt": "2026-11-14T21:30:00Z",
+  "carrierName": "North American Van Lines",
   "weightLbs": 9200.00,
   "amount": 3450.00,
   "isDuplicate": false
