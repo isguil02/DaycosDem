@@ -1,0 +1,31 @@
+@backend_HostAddress = http://localhost:5111
+
+### 1. Fetch all audited invoices (GET -> 200 OK)
+GET {{backend_HostAddress}}/invoices/
+Accept: application/json
+
+### 2. Submit a valid new invoice (POST -> 201 Created)
+POST {{backend_HostAddress}}/invoices/
+Content-Type: application/json
+
+{
+  "invoiceNumber": "INV-1004",
+  "carrierName": "North American Van Lines",
+  "createdAt": "2026-11-14T21:30:00Z",
+  "weightLbs": 9200.00,
+  "amount": 3450.00,
+  "isDuplicate": false
+}
+
+### 3. Test Invalid Input (POST -> 400 Bad Request)
+POST {{backend_HostAddress}}/invoices/
+Content-Type: application/json
+
+{
+  "invoiceNumber": "INV-9999",
+  "carrierName": "Bad Carrier",
+  "createdAt": "2026-11-14T21:30:00Z",
+  "weightLbs": 1000.00,
+  "amount": -50.00,
+  "isDuplicate": false
+}
