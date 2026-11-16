@@ -135,7 +135,74 @@ app.MapPost("/invoices", async (CreateInvoiceRequest request) =>
         CreatedAt = createdAt
     });
 });
+// POST /invoices/delete: Compliant soft-delete with reason & 90-day retention
+app.MapPost("/invoices/delete", async (DeleteInvoiceRequest request) =>
+{
+    if (string.IsNullOrWhiteSpace(request.Reason))
+    {
+        return Results.BadRequest("A deletion reason is required for DoD audit compliance.");
+    }
 
+    await using var conn = new NpgsqlConnection(connectionString);
+    await conn.OpenAsync();
+    await using var tx = await conn.BeginTransactionAsync();
+
+    try
+    {
+        // 1. Fetch the invoice to archive
+        var selectSql = "SELECT id, invoice_number, carrier_id, weight_lbs, amount, created_at FROM invoices WHERE id = @id;";
+        await using var selectCmd = new NpgsqlCommand(selectSql, conn, tx);
+        selectCmd.Parameters.AddWithValue("id", request.InvoiceId);
+
+        await using var reader = await selectCmd.ExecuteReaderAsync();
+        if (!await reader.ReadAsync())
+        {
+            return Results.NotFound($"Invoice with ID #{request.InvoiceId} not found.");
+        }
+
+        var id = reader.GetInt32(0);
+        var invNum = reader.GetString(1);
+        var carrierId = reader.GetInt32(2);
+        var weight = reader.GetDecimal(3);
+        var amount = reader.GetDecimal(4);
+        var createdAt = reader.GetFieldValue<DateTimeOffset>(5);
+        await reader.CloseAsync();
+
+        // 2. Insert into deleted_invoices archive table
+        var archiveSql = """
+            INSERT INTO deleted_invoices 
+            (id, invoice_number, carrier_id, weight_lbs, amount, original_created_at, deletion_reason)
+            VALUES (@id, @invNum, @carrierId, @weight, @amount, @createdAt, @reason);
+        """;
+        await using var archiveCmd = new NpgsqlCommand(archiveSql, conn, tx);
+        archiveCmd.Parameters.AddWithValue("id", id);
+        archiveCmd.Parameters.AddWithValue("invNum", invNum);
+        archiveCmd.Parameters.AddWithValue("carrierId", carrierId);
+        archiveCmd.Parameters.AddWithValue("weight", weight);
+        archiveCmd.Parameters.AddWithValue("amount", amount);
+        archiveCmd.Parameters.AddWithValue("createdAt", createdAt);
+        archiveCmd.Parameters.AddWithValue("reason", request.Reason);
+        await archiveCmd.ExecuteNonQueryAsync();
+
+        // 3. Delete from active invoices
+        await using var deleteCmd = new NpgsqlCommand("DELETE FROM invoices WHERE id = @id;", conn, tx);
+        deleteCmd.Parameters.AddWithValue("id", request.InvoiceId);
+        await deleteCmd.ExecuteNonQueryAsync();
+
+        // 4. Auto-purge records older than 90 days (Compliance policy)
+        await using var purgeCmd = new NpgsqlCommand(
+            "DELETE FROM deleted_invoices WHERE deleted_at < NOW() - INTERVAL '90 days';", conn, tx);
+        await purgeCmd.ExecuteNonQueryAsync();
+
+        await tx.CommitAsync();
+        return Results.Ok(new { message = $"Invoice #{id} ({invNum}) safely archived." });
+    }
+    catch (Exception ex)
+    {
+        await tx.RollbackAsync();
+        return Results.Problem($"Audit deletion failed: {ex.Message}");
+    }
+});
 app.Run();
 
 public record Invoice(
@@ -155,3 +222,5 @@ public record CreateInvoiceRequest(
     decimal WeightLbs,
     decimal Amount
 );
+
+public record DeleteInvoiceRequest(int InvoiceId, string Reason);

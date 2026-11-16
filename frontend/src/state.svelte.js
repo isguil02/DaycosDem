@@ -2,7 +2,9 @@ export const appState = $state({
     timeZone: 'UTC',
     view: 'manager',
     invoices: [],
-    loading: false
+    loading: false,
+    selectedInvoiceID: null
+
 });
 
 // Global fetch function: Any component can call this to refresh the data!

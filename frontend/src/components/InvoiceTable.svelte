@@ -68,7 +68,12 @@
         </thead>
         <tbody>
             {#each displayInvoices as inv}
-                <tr class={inv.isDuplicate ? "dup-row" : ""}>
+                <tr
+                    class={inv.isDuplicate ? "dup-row" : ""}
+                    class:selected={appState.selectedInvoiceID === inv.id}
+                    onclick={() => (appState.selectedInvoiceID = inv.id)}
+                    style="cursor: pointer;"
+                >
                     <td><code>#{inv.id}</code></td>
                     <td>{inv.invoiceNumber}</td>
                     <td>{inv.carrierName}</td>
@@ -178,5 +183,8 @@
     .stat-alert {
         color: var(--dup-text);
         font-weight: bold;
+    }
+    tr.selected {
+        outline: 2px solid var(--border-accent);
     }
 </style>

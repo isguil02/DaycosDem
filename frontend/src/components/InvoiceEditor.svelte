@@ -1,16 +1,18 @@
 <script>
-    import { fetchInvoices } from "../state.svelte.js";
+    import { appState, fetchInvoices } from "../state.svelte.js";
     /** @type {any[]}*/
     let invoices = $state([]);
     let loading = $state(true);
-
+    let { lockedCarrier = "" } = $props();
     // Form input variables for adding a new invoice
     let invoiceNumber = $state("");
-    let carrierName = $state("");
+    let carrierName = $state(lockedCarrier);
     let weightLbs = $state("");
     let amount = $state("");
     let formError = $state("");
     let selectMode = $state("add");
+    let deleteId = $state("");
+    let deleteReason = $state("");
 
     // Submit invoice to C# POST /invoices
     /** @param {any} e **/
@@ -58,6 +60,51 @@
                 "Could not connect to C# backend. Is dotnet run running?";
         }
     }
+    /** @param {any} e **/
+    async function handleDelete(e) {
+        e.preventDefault();
+        formError = "";
+
+        if (!deleteReason.trim()) {
+            formError = "DoD Compliance Error: Deletion reason is required.";
+            return;
+        }
+
+        try {
+            const res = await fetch("http://localhost:5111/invoices/delete", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    invoiceId: parseInt(deleteId),
+                    reason: deleteReason,
+                }),
+            });
+
+            if (!res.ok) {
+                const serverError = await res.text();
+                formError =
+                    serverError || `Failed to void invoice (${res.status})`;
+                return;
+            }
+
+            // SUCCESS: Clear fields and refresh the global invoices!
+            deleteId = "";
+            deleteReason = "";
+            await fetchInvoices();
+        } catch (err) {
+            formError = "Could not connect to backend to void invoice.";
+        }
+    }
+
+    $effect(() => {
+        if (lockedCarrier) {
+            carrierName = lockedCarrier;
+        }
+        if (appState.selectedInvoiceID) {
+            deleteId = appState.selectedInvoiceID;
+            selectMode = "remove";
+        }
+    });
 </script>
 
 <div class="card form-card">
@@ -84,6 +131,7 @@
             <input
                 id="carrier"
                 bind:value={carrierName}
+                disabled={!!lockedCarrier}
                 placeholder="Atlas World Group"
                 required
             />
@@ -118,10 +166,29 @@
             <button type="submit" class="btn-submit">Save to PostgreSQL</button>
         </form>
     {:else}
-        <div>
-            <h2>Remove Invoice</h2>
-            <p>Remove an invoice from the database.</p>
-        </div>
+        <h2>Void / Archive Invoice</h2>
+        <form onsubmit={handleDelete}>
+            <label for="delId">Invoice ID (#)</label>
+            <input
+                id="delId"
+                type="number"
+                bind:value={deleteId}
+                placeholder="e.g. 1"
+                required
+            />
+
+            <label for="delReason">Reason for Deletion (Required)</label>
+            <input
+                id="delReason"
+                bind:value={deleteReason}
+                placeholder="e.g. Duplicate billed by carrier"
+                required
+            />
+
+            <button type="submit" class="btn-submit">
+                🗑️ Void & Archive to Deleted
+            </button>
+        </form>
     {/if}
 </div>
 {#if formError}
@@ -144,7 +211,22 @@
 <style>
     .selector {
         display: flex;
+        justify-content: space-between;
     }
+    .selector button {
+        background-color: var(--primary);
+        border: none;
+        border-radius: 5px;
+        height: 3em;
+        width: 9em;
+        cursor: pointer;
+        color: var(--background);
+    }
+    button.active {
+        outline: 3px solid var(--border-accent);
+        font-weight: bold;
+    }
+
     .card {
         background: var(--card-bg);
         color: var(--text-main);
