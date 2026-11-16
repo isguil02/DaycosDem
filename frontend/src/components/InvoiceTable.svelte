@@ -1,17 +1,16 @@
 <script>
-    import { appState } from "../state.svelte.js";
-    let {
-        invoices = [],
-        loading = false,
-        onRefresh,
-        selectedTimeZone = "UTC",
-    } = $props();
+    // @ts-nocheck
+    import { appState, fetchInvoices } from "../state.svelte.js";
+    let { invoices = null } = $props();
+
+    // If a prop was passed (e.g. Carrier view), use it; otherwise use global appState.invoices!
+    let displayInvoices = $derived(invoices ?? appState.invoices);
     let duplicateCount = $derived(
-        invoices.filter((inv) => inv.isDuplicate).length,
+        displayInvoices.filter((inv) => inv.isDuplicate).length,
     );
 
     let totalAmount = $derived(
-        invoices
+        displayInvoices
             .reduce((sum, inv) => sum + Number(inv.amount), 0)
             .toLocaleString("en-US", { style: "currency", currency: "USD" }),
     );
@@ -33,16 +32,20 @@
 <div class="card table-card">
     <div class="table-header">
         <h2>Audited Invoices (PostgreSQL)</h2>
-        {#if onRefresh}
-            <button class="btn-refresh" onclick={onRefresh} disabled={loading}>
-                {loading ? "Refreshing..." : "🔄 Refresh Data"}
-            </button>
-        {/if}
+        <button
+            class="btn-refresh"
+            onclick={fetchInvoices}
+            disabled={appState.loading}
+        >
+            {appState.loading ? "Refreshing..." : "🔄 Refresh Data"}
+        </button>
     </div>
 
     <!-- Live Stats Mini-Bar -->
     <div class="table-stats">
-        <span class="TotalInvs">Total: <strong>{invoices.length}</strong></span>
+        <span class="TotalInvs"
+            >Total: <strong>{displayInvoices.length}</strong></span
+        >
         <span class="TotalSpend"
             >Total Spend: <strong>{totalAmount}</strong></span
         >
@@ -64,7 +67,7 @@
             </tr>
         </thead>
         <tbody>
-            {#each invoices as inv}
+            {#each displayInvoices as inv}
                 <tr class={inv.isDuplicate ? "dup-row" : ""}>
                     <td><code>#{inv.id}</code></td>
                     <td>{inv.invoiceNumber}</td>
