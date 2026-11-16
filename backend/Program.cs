@@ -28,7 +28,7 @@ app.MapGet("/invoices", async () =>
     await conn.OpenAsync();
 
     var sql = """
-        SELECT i.invoice_number, c.name, i.created_at, i.weight_lbs, i.amount
+        SELECT i.id, i.invoice_number, c.name, i.created_at, i.weight_lbs, i.amount
         FROM invoices i
         INNER JOIN carriers c ON i.carrier_id = c.id;
     """;
@@ -39,11 +39,12 @@ app.MapGet("/invoices", async () =>
     while (await reader.ReadAsync())
     {
         dbInvoices.Add(new Invoice(
-            reader.GetString(0),                     // invoice_number
-            reader.GetString(1),                     // carrier name (from carriers table!)
-            reader.GetFieldValue<DateTimeOffset>(2), // created_at (UTC)
-            reader.GetDecimal(3),                    // weight_lbs
-            reader.GetDecimal(4),                    // amount
+            reader.GetInt32(0),
+            reader.GetString(1),                     // invoice_number
+            reader.GetString(2),                     // carrier name (from carriers table!)
+            reader.GetFieldValue<DateTimeOffset>(3), // created_at (UTC)
+            reader.GetDecimal(4),                    // weight_lbs
+            reader.GetDecimal(5),                    // amount
             false                                    // isDuplicate (audited below)
         ));
     }
@@ -138,6 +139,7 @@ app.MapPost("/invoices", async (CreateInvoiceRequest request) =>
 app.Run();
 
 public record Invoice(
+    int id,
     string InvoiceNumber,
     string CarrierName,
     DateTimeOffset CreatedAt,

@@ -1,5 +1,6 @@
 <script>
     import { onMount } from "svelte";
+    import InvoiceTable from "./InvoiceTable.svelte";
 
     /** @type {any[]}*/
     let invoices = $state([]);
@@ -84,58 +85,10 @@
 
 <main class="dashboard">
     <h1>Manager Invoice Tracker</h1>
-    <div class="metrics">
-        <div class="card">
-            Total Invoices: <strong>{invoices.length}</strong>
-        </div>
-        <div class="card alert">
-            Duplicates Flagged: <strong>{duplicateCount}</strong>
-        </div>
-    </div>
 
     <div class="grid">
         <!-- Invoices Table -->
-        <div class="card table-card">
-            <div class="table-header">
-                <h2>Audited Invoices (PostgreSQL)</h2>
-                <button
-                    class="btn-refresh"
-                    onclick={fetchInvoices}
-                    disabled={loading}
-                >
-                    {loading ? "Refreshing..." : "🔄 Refresh Data"}
-                </button>
-            </div>
-
-            <table>
-                <thead>
-                    <tr>
-                        <th>Invoice #</th>
-                        <th>Carrier</th>
-                        <th>Weight</th>
-                        <th>Amount</th>
-                        <th>Audit Status</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {#each invoices as inv}
-                        <tr class={inv.isDuplicate ? "dup-row" : ""}>
-                            <td>{inv.invoiceNumber}</td>
-                            <td>{inv.carrierName}</td>
-                            <td>{inv.weightLbs} lbs</td>
-                            <td>${inv.amount}</td>
-                            <td>
-                                {#if inv.isDuplicate}
-                                    <span class="badge red">⚠️ DUPLICATE</span>
-                                {:else}
-                                    <span class="badge green">✓ Verified</span>
-                                {/if}
-                            </td>
-                        </tr>
-                    {/each}
-                </tbody>
-            </table>
-        </div>
+        <InvoiceTable {invoices} {loading} onRefresh={fetchInvoices} />
 
         <!-- Submit Form -->
         <div class="card form-card">
@@ -209,12 +162,6 @@
         padding: 0 1rem;
     }
 
-    .metrics {
-        display: flex;
-        gap: 1rem;
-        margin-bottom: 1.5rem;
-    }
-
     .card {
         background: var(--card-bg);
         color: var(--text-main);
@@ -224,80 +171,10 @@
         box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
     }
 
-    .alert {
-        border-left: 4px solid var(--dup-text);
-    }
-
     .grid {
         display: grid;
         grid-template-columns: 2fr 1fr;
         gap: 1.5rem;
-    }
-
-    .table-header {
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        margin-bottom: 1rem;
-    }
-
-    .table-header h2 {
-        margin: 0;
-    }
-
-    .btn-refresh {
-        background: var(--card-bg);
-        color: var(--text-main);
-        border: 1px solid var(--border);
-        padding: 0.4rem 0.8rem;
-        border-radius: 6px;
-        font-size: 0.85rem;
-        font-weight: 600;
-        cursor: pointer;
-        transition: background 0.15s ease;
-    }
-
-    .btn-refresh:hover {
-        background: var(--border);
-    }
-
-    table {
-        width: 100%;
-        border-collapse: collapse;
-        text-align: left;
-    }
-
-    th,
-    td {
-        padding: 0.75rem;
-        border-bottom: 1px solid var(--border);
-    }
-
-    th {
-        color: var(--text-muted);
-        font-size: 0.85rem;
-        text-transform: uppercase;
-    }
-
-    .dup-row {
-        background-color: var(--dup-row);
-    }
-
-    .badge {
-        padding: 0.25rem 0.5rem;
-        border-radius: 4px;
-        font-size: 0.75rem;
-        font-weight: bold;
-    }
-
-    .badge.red {
-        background: var(--dup-bg);
-        color: var(--dup-text);
-    }
-
-    .badge.green {
-        background: var(--verified-bg);
-        color: var(--verified-text);
     }
 
     form {
@@ -331,7 +208,7 @@
 
     .btn-submit {
         background: var(--primary);
-        color: white;
+        color: var(--background);
         padding: 0.75rem;
         border: none;
         border-radius: 6px;

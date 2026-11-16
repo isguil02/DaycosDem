@@ -1,9 +1,39 @@
 <script>
-    let { currentView = $bindable("manager") } = $props();
+    import { appState } from "../state.svelte.js";
+    let {
+        currentView = $bindable("manager"),
+        selectedTimeZone = $bindable("UTC"),
+    } = $props();
+    function getTime(timeZone = "UTC") {
+        return new Date().toLocaleTimeString("en-US", {
+            timeZone,
+            hour: "numeric",
+            minute: "2-digit",
+            hour12: true,
+        });
+    }
 </script>
 
 <header>
     <h1>Invoice Tracker</h1>
+    <div class="tz-container">
+        <label for="tz-select">🕒 Select Time Zone:</label>
+        <select id="tz-select" bind:value={appState.timeZone}>
+            <option value="UTC">UTC ({getTime("UTC")})</option>
+            <option value="America/Chicago"
+                >Central Time ({getTime("America/Chicago")})</option
+            >
+            <option value="America/New_York"
+                >Eastern Time ({getTime("America/New_York")})</option
+            >
+            <option value="America/Denver"
+                >Mountain Time ({getTime("America/Denver")})</option
+            >
+            <option value="America/Los_Angeles"
+                >Pacific Time ({getTime("America/Los_Angeles")})</option
+            >
+        </select>
+    </div>
     <div>
         <button
             class:active={currentView === "manager"}
@@ -62,6 +92,23 @@
 
     button.active {
         outline: 2px solid var(--border-accent);
+        font-weight: bold;
+    }
+    select {
+        background-color: var(--primary);
+        color: var(--background);
+        border: none;
+        border-radius: 5px;
+        height: 3em;
+        padding: 0 1em;
+        font-weight: bold;
+        cursor: pointer;
+        &:hover {
+            outline: 1px solid var(--border-accent);
+        }
+    }
+    .tz-container {
+        align-items: center;
         font-weight: bold;
     }
 </style>
