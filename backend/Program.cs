@@ -203,6 +203,61 @@ app.MapPost("/invoices/delete", async (DeleteInvoiceRequest request) =>
         return Results.Problem($"Audit deletion failed: {ex.Message}");
     }
 });
+
+// GET /carriers: Safe list of carriers for the dropdown
+app.MapGet("/carriers", async () =>
+{
+    var carriers = new List<object>();
+    await using var conn = new NpgsqlConnection(connectionString);
+    await conn.OpenAsync();
+
+    var sql = "SELECT id, name, contact_phone FROM carriers ORDER BY name;";
+    await using var cmd = new NpgsqlCommand(sql, conn);
+    await using var reader = await cmd.ExecuteReaderAsync();
+
+    while (await reader.ReadAsync())
+    {
+        carriers.Add(new
+        {
+            Id = reader.GetInt32(0),
+            Name = reader.GetString(1),
+            ContactPhone = reader.IsDBNull(2) ? null : reader.GetString(2)
+        });
+    }
+
+    return Results.Ok(carriers);
+});
+
+// POST /carriers/login: Authenticate carrier with password
+app.MapPost("/carriers/login", async (CarrierLoginRequest request) =>
+{
+    await using var conn = new NpgsqlConnection(connectionString);
+    await conn.OpenAsync();
+
+    var sql = "SELECT id, name, contact_phone, password_hash FROM carriers WHERE LOWER(name) = LOWER(@name);";
+    await using var cmd = new NpgsqlCommand(sql, conn);
+    cmd.Parameters.AddWithValue("name", request.CarrierName);
+
+    await using var reader = await cmd.ExecuteReaderAsync();
+    if (!await reader.ReadAsync())
+    {
+        return Results.NotFound("Carrier not registered with Daycos.");
+    }
+
+    var storedPassword = reader.IsDBNull(3) ? "daycos123" : reader.GetString(3);
+    if (storedPassword != request.Password)
+    {
+        return Results.Json(new { message = "Invalid password. Use phone number for recovery." }, statusCode: 401);
+    }
+
+    return Results.Ok(new
+    {
+        Id = reader.GetInt32(0),
+        Name = reader.GetString(1),
+        ContactPhone = reader.IsDBNull(2) ? null : reader.GetString(2)
+    });
+});
+
 app.Run();
 
 public record Invoice(
@@ -224,3 +279,4 @@ public record CreateInvoiceRequest(
 );
 
 public record DeleteInvoiceRequest(int InvoiceId, string Reason);
+public record CarrierLoginRequest(string CarrierName, string Password);

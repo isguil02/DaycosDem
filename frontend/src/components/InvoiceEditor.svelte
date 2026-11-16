@@ -6,7 +6,12 @@
     let { lockedCarrier = "" } = $props();
     // Form input variables for adding a new invoice
     let invoiceNumber = $state("");
-    let carrierName = $state(lockedCarrier);
+    let carrierName = $state("");
+    $effect(() => {
+        if (lockedCarrier) {
+            carrierName = lockedCarrier;
+        }
+    });
     let weightLbs = $state("");
     let amount = $state("");
     let formError = $state("");
