@@ -2,29 +2,14 @@
     // @ts-nocheck
     import { onMount } from "svelte";
     import { appState, fetchInvoices } from "../state.svelte.js";
-    import InvoiceTable from "./InvoiceTable.svelte";
     import InvoiceEditor from "./InvoiceEditor.svelte";
 
     let carrierList = $state([]);
     let selectedCarrier = $state("");
     let password = $state("");
-    let loggedInCarrier = $state(null);
     let loginError = $state("");
 
-    // Automatically filter invoices to only show this carrier's data
-    let filteredInvoices = $derived(
-        loggedInCarrier
-            ? appState.invoices.filter(
-                  (i) =>
-                      i.carrierName.toLowerCase() ===
-                      loggedInCarrier.name.toLowerCase(),
-              )
-            : [],
-    );
-
     onMount(async () => {
-        fetchInvoices();
-        // Fetch safe list of registered carriers for the dropdown
         try {
             const res = await fetch("http://localhost:5111/carriers");
             carrierList = await res.json();
@@ -35,7 +20,7 @@
             console.error("Failed to load carriers:", err);
         }
     });
-    /** @param {any} e **/
+
     async function handleLogin(e) {
         e.preventDefault();
         loginError = "";
@@ -56,7 +41,7 @@
                 return;
             }
 
-            loggedInCarrier = await res.json();
+            appState.loggedInCarrier = await res.json();
             password = "";
         } catch (err) {
             loginError = "Could not connect to server.";
@@ -64,105 +49,83 @@
     }
 
     function handleLogout() {
-        loggedInCarrier = null;
+        appState.loggedInCarrier = null;
         password = "";
         loginError = "";
     }
 </script>
 
-<main class="dashboard">
-    {#if !loggedInCarrier}
-        <!-- Carrier Login Screen -->
-        <div class="login-wrapper">
-            <div class="card login-card">
-                <h2>🚚 Carrier Portal Login</h2>
-                <p class="subtitle">
-                    Access your Daycos audited invoice records
-                </p>
+{#if !appState.loggedInCarrier}
+    <!-- Carrier Login Form (Right Column) -->
+    <div class="card login-card">
+        <h2>🚚 Carrier Sign In</h2>
+        <p class="subtitle">Log in to view and add your invoices</p>
 
-                {#if loginError}
-                    <div class="error-banner">{loginError}</div>
-                {/if}
+        {#if loginError}
+            <div class="error-banner">{loginError}</div>
+        {/if}
 
-                <form onsubmit={handleLogin}>
-                    <div class="form-group">
-                        <label for="carrierSelect">Select Carrier</label>
-                        <select id="carrierSelect" bind:value={selectedCarrier}>
-                            {#each carrierList as carrier}
-                                <option value={carrier.name}
-                                    >{carrier.name}</option
-                                >
-                            {/each}
-                        </select>
-                    </div>
-
-                    <div class="form-group">
-                        <label for="password">Password</label>
-                        <input
-                            id="password"
-                            type="password"
-                            bind:value={password}
-                            placeholder="Default: postgres"
-                            required
-                        />
-                    </div>
-
-                    <button type="submit" class="btn-primary"
-                        >Sign In to Portal</button
-                    >
-                </form>
-
-                <p class="hint">
-                    🔒 Demo default password: <code>postgres</code>
-                </p>
+        <form onsubmit={handleLogin}>
+            <div class="form-group">
+                <label for="carrierSelect">Select Carrier</label>
+                <select id="carrierSelect" bind:value={selectedCarrier}>
+                    {#each carrierList as carrier}
+                        <option value={carrier.name}>{carrier.name}</option>
+                    {/each}
+                </select>
             </div>
-        </div>
-    {:else}
-        <!-- Authenticated Carrier Dashboard -->
-        <div class="carrier-header">
+
+            <div class="form-group">
+                <label for="password">Password</label>
+                <input
+                    id="password"
+                    type="password"
+                    bind:value={password}
+                    placeholder="Default: postgres"
+                    required
+                />
+            </div>
+
+            <button type="submit" class="btn-primary">Sign In</button>
+        </form>
+
+        <p class="hint">🔒 Default password: <code>postgres</code></p>
+    </div>
+{:else}
+    <!-- Logged In Carrier: Header badge + Locked Invoice Editor -->
+    <div class="carrier-box">
+        <div class="carrier-auth-header">
             <div>
-                <h1>🚚 {loggedInCarrier.name} Portal</h1>
-                {#if loggedInCarrier.contactPhone}
+                <h3>🚚 {appState.loggedInCarrier.name}</h3>
+                {#if appState.loggedInCarrier.contactPhone}
                     <span class="phone-badge"
-                        >📞 Registered Phone: {loggedInCarrier.contactPhone}</span
+                        >📞 {appState.loggedInCarrier.contactPhone}</span
                     >
                 {/if}
             </div>
             <button class="btn-logout" onclick={handleLogout}>Log Out</button>
         </div>
 
-        <div class="grid">
-            <InvoiceTable invoices={filteredInvoices} />
-            <InvoiceEditor lockedCarrier={loggedInCarrier.name} />
-        </div>
-    {/if}
-</main>
+        <!-- Locked Invoice Editor with Carrier name pre-filled & locked! -->
+        <InvoiceEditor lockedCarrier={appState.loggedInCarrier.name} />
+    </div>
+{/if}
 
 <style>
-    .dashboard {
-        max-width: 1100px;
-        margin: 0 auto;
-        padding: 0 1rem;
-    }
-
-    .login-wrapper {
-        display: flex;
-        justify-content: center;
-        align-items: center;
-        padding-top: 3rem;
-    }
-
     .login-card {
-        max-width: 420px;
-        width: 100%;
+        background: var(--card-bg);
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        padding: 1.5rem;
         text-align: center;
+        height: 600px;
     }
 
     .subtitle {
         color: var(--text-muted);
-        font-size: 0.9rem;
+        font-size: 0.85rem;
         margin-top: -0.25rem;
-        margin-bottom: 1.5rem;
+        margin-bottom: 1.25rem;
     }
 
     .form-group {
@@ -181,36 +144,48 @@
         background: rgba(239, 68, 68, 0.15);
         color: #ef4444;
         border: 1px solid rgba(239, 68, 68, 0.3);
-        padding: 0.6rem 0.8rem;
+        padding: 0.5rem;
         border-radius: 6px;
         font-size: 0.85rem;
         margin-bottom: 1rem;
     }
 
-    .carrier-header {
+    .carrier-box {
+        display: flex;
+        flex-direction: column;
+        gap: 0.75rem;
+    }
+
+    .carrier-auth-header {
         display: flex;
         justify-content: space-between;
         align-items: center;
-        margin-bottom: 1.5rem;
+        background: var(--card-bg);
+        border: 1px solid var(--border);
+        padding: 0.75rem 1rem;
+        border-radius: 8px;
+    }
+
+    .carrier-auth-header h3 {
+        margin: 0;
+        font-size: 1rem;
     }
 
     .phone-badge {
-        font-size: 0.85rem;
+        font-size: 0.75rem;
         color: var(--text-muted);
     }
 
     .btn-logout {
         background: transparent;
         border: 1px solid var(--border);
-        color: var(--text);
-        padding: 0.4rem 0.8rem;
+        color: var(--text-main);
+        padding: 0.3rem 0.6rem;
         border-radius: 6px;
-        cursor: pointer;
-        font-size: 0.85rem;
+        font-size: 0.8rem;
     }
 
     .btn-logout:hover {
-        background: var(--card-bg);
         border-color: #ef4444;
         color: #ef4444;
     }
@@ -222,15 +197,9 @@
     }
 
     .hint code {
-        background: var(--card-bg);
+        background: var(--bg);
         padding: 0.2rem 0.4rem;
         border-radius: 4px;
         color: var(--primary);
-    }
-
-    .grid {
-        display: grid;
-        grid-template-columns: 2fr 1fr;
-        gap: 1.5rem;
     }
 </style>

@@ -4,7 +4,32 @@
     let { invoices = null } = $props();
 
     // If a prop was passed (e.g. Carrier view), use it; otherwise use global appState.invoices!
-    let displayInvoices = $derived(invoices ?? appState.invoices);
+    let baseInvoices = $derived(invoices ?? appState.invoices);
+
+    let displayInvoices = $derived(
+        appState.filter
+            ? baseInvoices.filter((inv) => {
+                  const f = appState.filter.toLowerCase().trim();
+
+                  // 1. If filter is "duplicates", show only duplicates
+                  if (f === "duplicates" || f === "duplicate") {
+                      return inv.isDuplicate;
+                  }
+
+                  // 2. If filter is ">4000", show invoices with amount greater than 4000
+                  if (f.startsWith(">")) {
+                      const minPrice = parseFloat(f.slice(1));
+                      return Number(inv.amount) > minPrice;
+                  }
+
+                  // 3. Otherwise, search carrier name or invoice number
+                  return (
+                      inv.carrierName.toLowerCase().includes(f) ||
+                      inv.invoiceNumber.toLowerCase().includes(f)
+                  );
+              })
+            : baseInvoices,
+    );
     let duplicateCount = $derived(
         displayInvoices.filter((inv) => inv.isDuplicate).length,
     );
@@ -101,6 +126,7 @@
         border-radius: 8px;
         border: 1px solid var(--border);
         box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+        min-height: 600px;
     }
 
     .table-header {

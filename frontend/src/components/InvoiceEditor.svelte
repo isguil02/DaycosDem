@@ -239,6 +239,7 @@
         border-radius: 8px;
         border: 1px solid var(--border);
         box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+        height: 600px;
     }
     form {
         display: flex;

@@ -3,8 +3,9 @@ export const appState = $state({
     view: 'manager',
     invoices: [],
     loading: false,
-    selectedInvoiceID: null
-
+    selectedInvoiceID: null,
+    filter: '',
+    loggedInCarrier: null
 });
 
 // Global fetch function: Any component can call this to refresh the data!

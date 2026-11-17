@@ -258,6 +258,92 @@ app.MapPost("/carriers/login", async (CarrierLoginRequest request) =>
     });
 });
 
+app.MapPut("/invoices/{id:int}", async (int id, UpdateInvoiceRequest request) =>
+{
+    await using var conn = new NpgsqlConnection(connectionString);
+    await conn.OpenAsync();
+
+    await using var checkCmd = new NpgsqlCommand("SELECT carrier_id FROM invoices WHERE id = @id", conn);
+    checkCmd.Parameters.AddWithValue("id", id);
+    var existingCarrierId = await checkCmd.ExecuteScalarAsync();
+
+    if (existingCarrierId == null)
+    {
+        return Results.NotFound($"Invoice #{id} not found.");
+    }
+    var sql = """
+        UPDATE invoices 
+        SET amount = COALESCE(@amount, amount),
+            weight_lbs = COALESCE(@weight, weight_lbs),
+            invoice_number = COALESCE(@invNum, invoice_number)
+        WHERE id = @id;
+    """;
+
+    await using var cmd = new NpgsqlCommand(sql, conn);
+    cmd.Parameters.AddWithValue("id", id);
+    cmd.Parameters.AddWithValue("amount", (object?)request.Amount ?? DBNull.Value);
+    cmd.Parameters.AddWithValue("weight", (object?)request.WeightLbs ?? DBNull.Value);
+    cmd.Parameters.AddWithValue("invNum", (object?)request.InvoiceNumber ?? DBNull.Value);
+
+    await cmd.ExecuteNonQueryAsync();
+
+    return Results.Ok(new { message = $"Invoice #{id} updated successfully." });
+});
+
+// POST /invoices/seed: Bulk generate realistic freight invoices in a single transaction
+app.MapPost("/invoices/seed", async (SeedInvoicesRequest request) =>
+{
+    // 1. Clamp count safely between 1 and 1,000
+    int count = Math.Clamp(request.Count, 1, 1000);
+    var carriers = new[] { "Allied Van Lines", "Atlas World Group", "Old Dominion Freight", "North American Van Lines" };
+    var rnd = new Random();
+
+    await using var conn = new NpgsqlConnection(connectionString);
+    await conn.OpenAsync();
+
+    // 2. Start Atomic Transaction (All or Nothing)
+    await using var tx = await conn.BeginTransactionAsync();
+
+    try
+    {
+        for (int i = 0; i < count; i++)
+        {
+            var carrier = carriers[rnd.Next(carriers.Length)];
+            var invNum = $"INV-{rnd.Next(1000, 9999)}";
+            var weight = rnd.Next(40, 260) * 100m; // 4,000 to 26,000 lbs
+            var amount = Math.Round((weight * 0.35m) + rnd.Next(100, 500), 2);
+
+            // Get carrier ID
+            await using var cCmd = new NpgsqlCommand("SELECT id FROM carriers WHERE name = @name", conn, tx);
+            cCmd.Parameters.AddWithValue("name", carrier);
+            var cId = (int)(await cCmd.ExecuteScalarAsync())!;
+
+            // Insert invoice with a random date over the last 30 days
+            var sql = """
+                INSERT INTO invoices (carrier_id, invoice_number, weight_lbs, amount, created_at)
+                VALUES (@cId, @invNum, @weight, @amount, NOW() - (interval '1 day' * @daysAgo))
+            """;
+            await using var iCmd = new NpgsqlCommand(sql, conn, tx);
+            iCmd.Parameters.AddWithValue("cId", cId);
+            iCmd.Parameters.AddWithValue("invNum", invNum);
+            iCmd.Parameters.AddWithValue("weight", weight);
+            iCmd.Parameters.AddWithValue("amount", amount);
+            iCmd.Parameters.AddWithValue("daysAgo", rnd.Next(0, 30));
+            await iCmd.ExecuteNonQueryAsync();
+        }
+
+        // 3. All succeeded! Commit the transaction
+        await tx.CommitAsync();
+        return Results.Ok(new { message = $"Successfully generated {count} realistic freight invoices." });
+    }
+    catch (Exception ex)
+    {
+        // 4. Any error rolls back all inserts completely
+        await tx.RollbackAsync();
+        return Results.Problem($"Batch generation failed: {ex.Message}");
+    }
+});
+
 app.Run();
 
 public record Invoice(
@@ -280,3 +366,5 @@ public record CreateInvoiceRequest(
 
 public record DeleteInvoiceRequest(int InvoiceId, string Reason);
 public record CarrierLoginRequest(string CarrierName, string Password);
+public record UpdateInvoiceRequest(string? InvoiceNumber, string? CarrierName, decimal? Amount, decimal? WeightLbs, DateTimeOffset? CreatedAt);
+public record SeedInvoicesRequest(int Count);
