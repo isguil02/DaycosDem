@@ -7,16 +7,17 @@
   import InvoiceTable from "./components/InvoiceTable.svelte";
   import InvoiceEditor from "./components/InvoiceEditor.svelte";
   import Carrier from "./components/Carrier.svelte";
+  import app from "./main.js";
 
   onMount(() => {
     fetchInvoices();
   });
 
-  let currentView = $state("manager");
+  appState.view;
 
   // In carrier view, show only that carrier's invoices (or empty if not logged in yet)
   let carrierFilteredInvoices = $derived(
-    currentView === "carrier"
+    appState.view === "carrier"
       ? appState.loggedInCarrier
         ? appState.invoices.filter(
             (i) =>
@@ -28,7 +29,7 @@
   );
 </script>
 
-<Header bind:currentView />
+<Header bind:currentView={appState.view} />
 
 <main class="container">
   <div class="grid">
@@ -39,7 +40,7 @@
     <InvoiceTable invoices={carrierFilteredInvoices} />
 
     <!-- 3. Right: Manager Editor OR Carrier Login/Locked Editor -->
-    {#if currentView === "manager"}
+    {#if appState.view === "manager"}
       <InvoiceEditor />
     {:else}
       <Carrier />

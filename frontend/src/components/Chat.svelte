@@ -4,6 +4,16 @@
 
     let inputMessage = $state("");
     let loading = $state(false);
+    let messageCounter = 2;
+    function getNextId() {
+        return messageCounter++;
+    }
+
+    let activeModel = $derived(
+        appState.view === "carrier" && appState.loggedInCarrier
+            ? "daycos-carrier"
+            : "daycos-auditor",
+    );
 
     let messages = $state([
         {
@@ -31,13 +41,13 @@
             minute: "2-digit",
         });
         messages.push({
-            id: Date.now(),
+            id: getNextId(),
             sender: "user",
             time: now,
             text: `Filter: ${label}`,
         });
         messages.push({
-            id: Date.now() + 1,
+            id: getNextId(),
             sender: "bot",
             time: now,
             text: filterVal
@@ -73,7 +83,7 @@
             await fetchInvoices(); // Refresh the live table!
 
             messages.push({
-                id: Date.now(),
+                id: getNextId(),
                 sender: "bot",
                 time: now,
                 text: `✅ Action executed successfully! ${msg.action.successMessage}`,
@@ -81,7 +91,7 @@
         } catch (err) {
             msg.action.status = "failed";
             messages.push({
-                id: Date.now(),
+                id: getNextId(),
                 sender: "bot",
                 time: now,
                 text: `⚠️ Execution failed: ${err.message}`,
@@ -99,7 +109,7 @@
             minute: "2-digit",
         });
         messages.push({
-            id: Date.now(),
+            id: getNextId(),
             sender: "bot",
             time: now,
             text: "❌ Action cancelled by auditor. No database changes were made.",
@@ -117,7 +127,7 @@
             minute: "2-digit",
         });
         messages.push({
-            id: Date.now(),
+            id: getNextId(),
             sender: "user",
             time: now,
             text: prompt,
@@ -126,14 +136,15 @@
         scrollToBottom();
 
         const lower = prompt.toLowerCase();
-        const isCarrier = !!appState.loggedInCarrier;
+        const isCarrier =
+            appState.view === "carrier" && !!appState.loggedInCarrier;
         const activeCarrierName = appState.loggedInCarrier?.name || "";
 
         // ─────────────────────────────────────────────────────────────
         // 1. SECURITY & PERMISSION GUARDRAILS
         // ─────────────────────────────────────────────────────────────
 
-        // Rule A: Never reveal passwords / credentials (Manager & Carrier)
+        // Rule A: Never reveal passwords / credentials
         if (
             lower.includes("password") ||
             lower.includes("secret") ||
@@ -141,7 +152,7 @@
             lower.includes("credential")
         ) {
             messages.push({
-                id: Date.now(),
+                id: getNextId(),
                 sender: "bot",
                 time: now,
                 text: "🔒 Security Policy: Carrier authentication credentials (password hashes) are strictly confidential and cannot be revealed or exported.",
@@ -158,7 +169,7 @@
                 lower.includes("dummy")
             ) {
                 messages.push({
-                    id: Date.now(),
+                    id: getNextId(),
                     sender: "bot",
                     time: now,
                     text: `🛑 Access Denied: Bulk test data generation is restricted to internal Managers. Carrier accounts cannot create batch data.`,
@@ -167,7 +178,6 @@
                 return;
             }
 
-            // Check if carrier is trying to filter by a competitor
             const competitorKeywords = [
                 "allied",
                 "atlas",
@@ -177,7 +187,7 @@
             ].filter((c) => !activeCarrierName.toLowerCase().includes(c));
             if (competitorKeywords.some((c) => lower.includes(c))) {
                 messages.push({
-                    id: Date.now(),
+                    id: getNextId(),
                     sender: "bot",
                     time: now,
                     text: `🛑 Access Denied: You are authenticated as ${activeCarrierName}. You cannot query or view records for external carriers.`,
@@ -188,7 +198,7 @@
         }
 
         // ─────────────────────────────────────────────────────────────
-        // 2. SMART INSTANT FILTERING (0ms)
+        // 2. ROCK-SOLID NUMERIC & STATE FILTERS (0ms)
         // ─────────────────────────────────────────────────────────────
 
         // Reset / Clear
@@ -199,7 +209,7 @@
         ) {
             appState.filter = "";
             messages.push({
-                id: Date.now(),
+                id: getNextId(),
                 sender: "bot",
                 time: now,
                 text: "🧹 Filter cleared. Showing all invoices.",
@@ -212,7 +222,7 @@
         if (lower.includes("duplicate")) {
             appState.filter = "duplicates";
             messages.push({
-                id: Date.now(),
+                id: getNextId(),
                 sender: "bot",
                 time: now,
                 text: "🔍 Filtered table to show flagged duplicate invoices.",
@@ -221,78 +231,93 @@
             return;
         }
 
-        // Weight filter (e.g. "more than 9000 lbs", "over 9000 lbs", "weight > 9000")
-        const weightMatch = lower.match(
-            /(?:more than|over|greater than|>)\s*(\d+)\s*(?:lbs|pounds|weight)?/,
+        // Context Memory: "i meant 10000", "actually 3000"
+        const correctionMatch = lower.match(
+            /(?:i meant|actually|make it|make that|change to)\s*\$?(\d+(?:\.\d+)?\s*k?)/,
         );
-        if (
-            weightMatch &&
-            (lower.includes("lb") ||
+        if (correctionMatch && appState.filter) {
+            let num = parseFloat(correctionMatch[1]);
+            if (correctionMatch[1].includes("k")) num *= 1000;
+            const op = appState.filter.includes("<") ? "<" : ">";
+
+            if (appState.filter.startsWith("weight")) {
+                appState.filter = `weight${op}${num}`;
+                messages.push({
+                    id: getNextId(),
+                    sender: "bot",
+                    time: now,
+                    text: `⚖️ Updated filter: shipments ${op === "<" ? "under" : "over"} ${num.toLocaleString()} lbs.`,
+                });
+                scrollToBottom();
+                return;
+            }
+            if (
+                appState.filter.startsWith("amount") ||
+                appState.filter.startsWith(">") ||
+                appState.filter.startsWith("<")
+            ) {
+                appState.filter = `amount${op}${num}`;
+                messages.push({
+                    id: getNextId(),
+                    sender: "bot",
+                    time: now,
+                    text: `💰 Updated filter: invoices ${op === "<" ? "under" : "over"} $${num.toLocaleString()}.`,
+                });
+                scrollToBottom();
+                return;
+            }
+        }
+
+        // Greater Than (>) or Less Than (<) for Weight & Amount
+        const isUnder =
+            lower.includes("under") ||
+            lower.includes("less") ||
+            lower.includes("below") ||
+            lower.includes("<");
+        const isOver =
+            lower.includes("over") ||
+            lower.includes("more") ||
+            lower.includes("greater") ||
+            lower.includes("above") ||
+            lower.includes(">");
+        const numMatch = lower.match(/\$?(\d+(?:\.\d+)?\s*k?)\b/);
+
+        if (numMatch && (isOver || isUnder)) {
+            let qty = parseFloat(numMatch[1]);
+            if (numMatch[1].includes("k")) qty *= 1000;
+            const op = isUnder ? "<" : ">";
+            const word = isUnder ? "under" : "over";
+
+            if (
+                lower.includes("lb") ||
                 lower.includes("weight") ||
-                lower.includes("pound"))
-        ) {
-            const lbs = weightMatch[1];
-            appState.filter = `weight>${lbs}`;
-            messages.push({
-                id: Date.now(),
-                sender: "bot",
-                time: now,
-                text: `⚖️ Filtered table: showing shipments over ${Number(lbs).toLocaleString()} lbs.`,
-            });
-            scrollToBottom();
-            return;
-        }
+                lower.includes("pound")
+            ) {
+                appState.filter = `weight${op}${qty}`;
+                messages.push({
+                    id: getNextId(),
+                    sender: "bot",
+                    time: now,
+                    text: `⚖️ Filtered table: showing shipments ${word} ${qty.toLocaleString()} lbs.`,
+                });
+                scrollToBottom();
+                return;
+            }
 
-        // Amount filter (e.g. "over $4000", "more than 3000 dollars")
-        const priceMatch = lower.match(
-            /(?:more than|over|greater than|>|\$)\s*(\d+(?:\.\d+)?)/,
-        );
-        if (
-            priceMatch &&
-            (lower.includes("$") ||
-                lower.includes("dollar") ||
-                lower.includes("amount") ||
-                lower.includes("price") ||
-                lower.includes("cost"))
-        ) {
-            const amt = priceMatch[1];
-            appState.filter = `amount>${amt}`;
+            appState.filter = `amount${op}${qty}`;
             messages.push({
-                id: Date.now(),
+                id: getNextId(),
                 sender: "bot",
                 time: now,
-                text: `💰 Filtered table: showing invoices over $${Number(amt).toLocaleString()}.`,
-            });
-            scrollToBottom();
-            return;
-        }
-
-        // Keyword & Carrier Filter (e.g. "only show atlas", "filter allied")
-        const filterKeywordMatch = lower.match(
-            /(?:only show|show me|show|filter to|filter)\s+(?:keyword\s+)?([a-z0-9\s-]+)/,
-        );
-        if (
-            filterKeywordMatch &&
-            !lower.includes("invoice") &&
-            !lower.includes("generate")
-        ) {
-            const target = filterKeywordMatch[1].trim();
-            appState.filter = target;
-            messages.push({
-                id: Date.now(),
-                sender: "bot",
-                time: now,
-                text: `🚚 Filtered table to show: "${target}".`,
+                text: `💰 Filtered table: showing invoices ${word} $${qty.toLocaleString()}.`,
             });
             scrollToBottom();
             return;
         }
 
         // ─────────────────────────────────────────────────────────────
-        // 3. MUTATING ACTIONS (Require Human Confirmation!)
+        // 3. MUTATING ACTIONS (Generate / Seed)
         // ─────────────────────────────────────────────────────────────
-
-        // Action A: Bulk Generate / Seed Invoices ("generate 1k invoices", "seed 100 dummy invoices")
         if (
             lower.includes("generate") ||
             lower.includes("seed") ||
@@ -309,14 +334,14 @@
             count = Math.min(Math.max(count, 1), 1000);
 
             messages.push({
-                id: Date.now(),
+                id: getNextId(),
                 sender: "bot",
                 time: now,
-                text: `⚠️ Action Confirmation Required: You requested to bulk-generate **${count} synthetic invoices** across registered carriers for audit stress testing.`,
+                text: `⚠️ Action Confirmation Required: Generate **${count} synthetic invoices** across carriers for audit benchmarking?`,
                 action: {
                     type: "seed",
-                    title: `Seed ${count} Synthetic Invoices`,
-                    impact: `Inserts ${count} realistic freight invoices into PostgreSQL in a single atomic transaction.`,
+                    title: `Seed ${count} Invoices`,
+                    impact: `Inserts ${count} invoices into PostgreSQL in a single atomic transaction.`,
                     status: "pending",
                     method: "POST",
                     url: "http://localhost:5111/invoices/seed",
@@ -328,38 +353,11 @@
             return;
         }
 
-        // Action B: Restore / Un-Delete Invoice ("restore invoice #2", "un-delete invoice 5")
-        const restoreMatch = lower.match(
-            /(?:restore|un-delete|undelete|recover)\s+(?:invoice\s+)?#?(\d+)/,
-        );
-        if (restoreMatch) {
-            const invId = parseInt(restoreMatch[1]);
-            messages.push({
-                id: Date.now(),
-                sender: "bot",
-                time: now,
-                text: `⚠️ Action Confirmation Required: Restore archived Invoice #${invId} from the 90-day compliance archive back to the active ledger?`,
-                action: {
-                    type: "restore",
-                    title: `Restore Invoice #${invId}`,
-                    impact: `Moves Invoice #${invId} from 'deleted_invoices' back to active 'invoices'.`,
-                    status: "pending",
-                    method: "POST",
-                    url: `http://localhost:5111/invoices/restore/${invId}`,
-                    body: null,
-                    successMessage: `Invoice #${invId} restored to active audit ledger.`,
-                },
-            });
-            scrollToBottom();
-            return;
-        }
-
         // ─────────────────────────────────────────────────────────────
         // 4. GENERAL AUDIT COPILOT REASONING (Ollama LLM)
         // ─────────────────────────────────────────────────────────────
         loading = true;
         try {
-            const activeModel = isCarrier ? "daycos-carrier" : "daycos-auditor";
             const roleText = isCarrier
                 ? `Authenticated Carrier: ${activeCarrierName}`
                 : "Internal Senior Auditor (Manager)";
@@ -369,22 +367,70 @@
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
                     model: activeModel,
-                    prompt: `[Security Context: ${roleText} | Active Invoices: ${appState.invoices.length}]\n\nUser Question: ${prompt}`,
+                    prompt: `Context: ${roleText}, ${appState.invoices.length} active shipping records.\nQuestion: ${prompt}`,
                     stream: false,
                 }),
             });
 
             if (!res.ok) throw new Error("Ollama call failed");
             const data = await res.json();
+
+            // 🎯 Detect proposed CLI command and build the [Execute Yes / No] card!
+            const cmdMatch = data.response.match(
+                /(?:`|\b)(\.?\\?cli\\(?:manager|carrier)\.ps1[^\n`]+)(?:`|\b)/i,
+            );
+            let action = null;
+
+            if (cmdMatch) {
+                const cmd = cmdMatch[1].trim();
+                let url = "http://localhost:5111/system/backup";
+                let impact = "Execute administrative command";
+                let successMessage = "Command executed successfully.";
+                let body = null;
+
+                if (cmd.includes("nuke")) {
+                    url = "http://localhost:5111/system/nuke";
+                    impact =
+                        "Simulates accidental wipe (DELETE FROM invoices).";
+                    successMessage = "Ledger wiped to $0 spend.";
+                } else if (cmd.includes("restore")) {
+                    url = "http://localhost:5111/system/restore-backup";
+                    impact =
+                        "Restores ledger from newest backup folder in PostgreSQL.";
+                    successMessage = "Invoices restored from snapshot.";
+                } else if (cmd.includes("seed")) {
+                    url = "http://localhost:5111/invoices/seed";
+                    impact = "Seeds synthetic invoices into PostgreSQL.";
+                    body = { count: 50 };
+                    successMessage = "Batch invoices generated.";
+                } else if (cmd.includes("backup")) {
+                    url = "http://localhost:5111/system/backup";
+                    impact = "Creates snapshot of all 4 tables in backups/.";
+                    successMessage = "Backup snapshot created.";
+                }
+
+                action = {
+                    type: "cli",
+                    title: `Run Command: ${cmd}`,
+                    impact: impact,
+                    status: "pending",
+                    method: "POST",
+                    url: url,
+                    body: body,
+                    successMessage: successMessage,
+                };
+            }
+
             messages.push({
-                id: Date.now(),
+                id: getNextId(),
                 sender: "bot",
                 time: now,
                 text: data.response,
+                action: action,
             });
         } catch (err) {
             messages.push({
-                id: Date.now(),
+                id: getNextId(),
                 sender: "bot",
                 time: now,
                 text: "⚠️ Local Ollama is offline. Ensure `ollama run llama3.2:1b` is running.",
@@ -406,11 +452,7 @@
                 <span class="subtext">Norfolk Audit Engine</span>
             </div>
         </div>
-        <span class="model-badge"
-            >🟢 {appState.loggedInCarrier
-                ? "daycos-carrier"
-                : "daycos-auditor"}</span
-        >
+        <span class="model-badge">🟢 {activeModel}</span>
     </div>
 
     <!-- Quick Filter Pills -->
@@ -447,7 +489,7 @@
 
     <!-- Messages Stream -->
     <div class="messages" bind:this={chatContainer}>
-        {#each messages as msg (msg.id)}
+        {#each messages as msg, i (i)}
             <div class="msg-row {msg.sender}">
                 <div class="msg-bubble {msg.sender}">
                     <p>{msg.text}</p>
@@ -497,9 +539,7 @@
         {#if loading}
             <div class="msg-row bot">
                 <div class="msg-bubble bot thinking">
-                    <span class="spinner"></span> Thinking with {appState.loggedInCarrier
-                        ? "daycos-carrier"
-                        : "daycos-auditor"}...
+                    <span class="spinner"></span> Thinking with {activeModel}...
                 </div>
             </div>
         {/if}

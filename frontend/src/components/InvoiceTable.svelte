@@ -16,16 +16,49 @@
                       return inv.isDuplicate;
                   }
 
-                  // 2. If filter is ">4000", show invoices with amount greater than 4000
-                  if (f.startsWith(">")) {
-                      const minPrice = parseFloat(f.slice(1));
-                      return Number(inv.amount) > minPrice;
+                  // 2. Weight filter (> or <)
+                  if (f.startsWith("weight>")) {
+                      return (
+                          Number(inv.weightLbs) >
+                          parseFloat(f.replace("weight>", ""))
+                      );
+                  }
+                  if (f.startsWith("weight<")) {
+                      return (
+                          Number(inv.weightLbs) <
+                          parseFloat(f.replace("weight<", ""))
+                      );
                   }
 
-                  // 3. Otherwise, search carrier name or invoice number
+                  // 3. Price / Amount filter (> or <)
+                  if (f.startsWith("amount>") || f.startsWith(">")) {
+                      const val = parseFloat(
+                          f.replace("amount>", "").replace(">", ""),
+                      );
+                      return Number(inv.amount) > val;
+                  }
+                  if (f.startsWith("amount<") || f.startsWith("<")) {
+                      const val = parseFloat(
+                          f.replace("amount<", "").replace("<", ""),
+                      );
+                      return Number(inv.amount) < val;
+                  }
+
+                  // 4. Ends-with / Starts-with filter (e.g. "ending in 0")
+                  if (f.startsWith("endswith:")) {
+                      const suffix = f.replace("endswith:", "").trim();
+                      return inv.invoiceNumber.toLowerCase().endsWith(suffix);
+                  }
+                  if (f.startsWith("startswith:")) {
+                      const prefix = f.replace("startswith:", "").trim();
+                      return inv.invoiceNumber.toLowerCase().startsWith(prefix);
+                  }
+
+                  // 5. Default: Search Carrier Name, Invoice #, or ID
                   return (
                       inv.carrierName.toLowerCase().includes(f) ||
-                      inv.invoiceNumber.toLowerCase().includes(f)
+                      inv.invoiceNumber.toLowerCase().includes(f) ||
+                      String(inv.id) === f.replace("#", "")
                   );
               })
             : baseInvoices,
