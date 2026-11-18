@@ -503,10 +503,10 @@ app.MapPost("/system/restore-backup", async (int? beforeMinutes) =>
             """;
             await using var iCmd = new NpgsqlCommand(insSql, conn, tx);
             iCmd.Parameters.AddWithValue("cId", el.GetProperty("carrierId").GetInt32());
-            iCmd.Parameters.AddWithValue("invNum", el.GetProperty("invoiceNumber").GetString());
+            iCmd.Parameters.AddWithValue("invNum", el.GetProperty("invoiceNumber").GetString() ?? "");
             iCmd.Parameters.AddWithValue("weight", el.GetProperty("weightLbs").GetDecimal());
             iCmd.Parameters.AddWithValue("amount", el.GetProperty("amount").GetDecimal());
-            iCmd.Parameters.AddWithValue("createdAt", DateTimeOffset.Parse(el.GetProperty("createdAt").GetString()));
+            iCmd.Parameters.AddWithValue("createdAt", DateTimeOffset.Parse(el.GetProperty("createdAt").GetString()!));
             await iCmd.ExecuteNonQueryAsync();
         }
 
