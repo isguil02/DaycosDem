@@ -1,0 +1,62 @@
+[
+  {
+    "id": 3,
+    "invoiceNumber": "INV-1001",
+    "carrierId": 1,
+    "weightLbs": 7500.00,
+    "amount": 2450.50,
+    "originalCreatedAt": "2026-11-15T05:36:34.367402+00:00",
+    "deletedAt": "2026-11-16T06:46:59.778728+00:00",
+    "reason": "Duplicate"
+  },
+  {
+    "id": 7,
+    "invoiceNumber": "asdf",
+    "carrierId": 7,
+    "weightLbs": 12.00,
+    "amount": 123.00,
+    "originalCreatedAt": "2026-11-15T20:56:54.598608+00:00",
+    "deletedAt": "2026-11-16T06:47:15.315186+00:00",
+    "reason": "test"
+  },
+  {
+    "id": 8,
+    "invoiceNumber": "asdf",
+    "carrierId": 2,
+    "weightLbs": 5454.00,
+    "amount": 54545454.00,
+    "originalCreatedAt": "2026-11-15T23:50:57.112694+00:00",
+    "deletedAt": "2026-11-16T06:47:25.159929+00:00",
+    "reason": "test"
+  },
+  {
+    "id": 6,
+    "invoiceNumber": "Inv-6969",
+    "carrierId": 6,
+    "weightLbs": 9899.00,
+    "amount": 4500.00,
+    "originalCreatedAt": "2026-11-15T20:40:12.160419+00:00",
+    "deletedAt": "2026-11-16T07:04:08.490817+00:00",
+    "reason": "Bad"
+  },
+  {
+    "id": 10,
+    "invoiceNumber": "INV-1001",
+    "carrierId": 1,
+    "weightLbs": 12.00,
+    "amount": 123.00,
+    "originalCreatedAt": "2026-11-16T07:38:07.836235+00:00",
+    "deletedAt": "2026-11-16T07:38:37.659626+00:00",
+    "reason": "Duplicate"
+  },
+  {
+    "id": 11,
+    "invoiceNumber": "INV-1001",
+    "carrierId": 1,
+    "weightLbs": 55454.00,
+    "amount": 5454.00,
+    "originalCreatedAt": "2026-11-16T17:44:21.52789+00:00",
+    "deletedAt": "2026-11-17T18:22:55.26164+00:00",
+    "reason": "Duplocate"
+  }
+]

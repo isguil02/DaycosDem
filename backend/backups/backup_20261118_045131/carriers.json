@@ -1,0 +1,50 @@
+[
+  {
+    "id": 1,
+    "name": "Allied Van Lines",
+    "carrierCode": "ALVD",
+    "phone": null
+  },
+  {
+    "id": 2,
+    "name": "Atlas World Group",
+    "carrierCode": "ATWG",
+    "phone": null
+  },
+  {
+    "id": 3,
+    "name": "Old Dominion Freight",
+    "carrierCode": "ODFL",
+    "phone": null
+  },
+  {
+    "id": 4,
+    "name": "North American Van Lines2",
+    "carrierCode": "7EFE",
+    "phone": null
+  },
+  {
+    "id": 5,
+    "name": "North American Van Lines",
+    "carrierCode": "77EA",
+    "phone": null
+  },
+  {
+    "id": 6,
+    "name": "Bob Burgs",
+    "carrierCode": "973C",
+    "phone": null
+  },
+  {
+    "id": 7,
+    "name": "asdf",
+    "carrierCode": "2711",
+    "phone": null
+  },
+  {
+    "id": 8,
+    "name": "New c",
+    "carrierCode": "901F",
+    "phone": null
+  }
+]

@@ -1,0 +1,234 @@
+[
+  {
+    "id": 1,
+    "carrierId": 1,
+    "invoiceNumber": "INV-1001",
+    "weightLbs": 7500.00,
+    "amount": 2450.50,
+    "createdAt": "2026-11-15T05:36:34.367402+00:00"
+  },
+  {
+    "id": 2,
+    "carrierId": 2,
+    "invoiceNumber": "INV-1002",
+    "weightLbs": 12400.00,
+    "amount": 4120.00,
+    "createdAt": "2026-11-15T05:36:34.367402+00:00"
+  },
+  {
+    "id": 4,
+    "carrierId": 4,
+    "invoiceNumber": "INV-1004",
+    "weightLbs": 9200.00,
+    "amount": 3450.00,
+    "createdAt": "2026-11-15T07:12:24.440151+00:00"
+  },
+  {
+    "id": 5,
+    "carrierId": 5,
+    "invoiceNumber": "INV-1004",
+    "weightLbs": 9200.00,
+    "amount": 3450.00,
+    "createdAt": "2026-11-15T07:13:07.657445+00:00"
+  },
+  {
+    "id": 9,
+    "carrierId": 1,
+    "invoiceNumber": "INV-HISTORICAL",
+    "weightLbs": 8500.00,
+    "amount": 3100.00,
+    "createdAt": "2026-10-12T14:30:00+00:00"
+  },
+  {
+    "id": 12,
+    "carrierId": 8,
+    "invoiceNumber": "INV-1001",
+    "weightLbs": 54.00,
+    "amount": 985.00,
+    "createdAt": "2026-11-17T18:23:20.9683+00:00"
+  },
+  {
+    "id": 13,
+    "carrierId": 2,
+    "invoiceNumber": "INV-1021",
+    "weightLbs": 10000.00,
+    "amount": 5859.00,
+    "createdAt": "2026-11-18T02:55:02.368418+00:00"
+  },
+  {
+    "id": 14,
+    "carrierId": 5,
+    "invoiceNumber": "INV-5655",
+    "weightLbs": 22000.00,
+    "amount": 7871.00,
+    "createdAt": "2026-11-05T02:59:49.468437+00:00"
+  },
+  {
+    "id": 15,
+    "carrierId": 5,
+    "invoiceNumber": "INV-5183",
+    "weightLbs": 15100.00,
+    "amount": 5632.00,
+    "createdAt": "2026-10-23T01:59:49.468437+00:00"
+  },
+  {
+    "id": 16,
+    "carrierId": 3,
+    "invoiceNumber": "INV-5029",
+    "weightLbs": 21700.00,
+    "amount": 8052.00,
+    "createdAt": "2026-10-25T01:59:49.468437+00:00"
+  },
+  {
+    "id": 17,
+    "carrierId": 2,
+    "invoiceNumber": "INV-2008",
+    "weightLbs": 11600.00,
+    "amount": 4409.00,
+    "createdAt": "2026-11-04T02:59:49.468437+00:00"
+  },
+  {
+    "id": 18,
+    "carrierId": 5,
+    "invoiceNumber": "INV-6060",
+    "weightLbs": 12900.00,
+    "amount": 4758.00,
+    "createdAt": "2026-11-05T02:59:49.468437+00:00"
+  },
+  {
+    "id": 19,
+    "carrierId": 1,
+    "invoiceNumber": "INV-5452",
+    "weightLbs": 25600.00,
+    "amount": 9340.00,
+    "createdAt": "2026-10-26T01:59:49.468437+00:00"
+  },
+  {
+    "id": 20,
+    "carrierId": 3,
+    "invoiceNumber": "INV-5980",
+    "weightLbs": 6500.00,
+    "amount": 2736.00,
+    "createdAt": "2026-10-23T01:59:49.468437+00:00"
+  },
+  {
+    "id": 21,
+    "carrierId": 5,
+    "invoiceNumber": "INV-5877",
+    "weightLbs": 8800.00,
+    "amount": 3227.00,
+    "createdAt": "2026-10-31T01:59:49.468437+00:00"
+  },
+  {
+    "id": 22,
+    "carrierId": 1,
+    "invoiceNumber": "INV-4806",
+    "weightLbs": 25700.00,
+    "amount": 9494.00,
+    "createdAt": "2026-10-28T01:59:49.468437+00:00"
+  },
+  {
+    "id": 23,
+    "carrierId": 1,
+    "invoiceNumber": "INV-5593",
+    "weightLbs": 5900.00,
+    "amount": 2354.00,
+    "createdAt": "2026-10-31T01:59:49.468437+00:00"
+  },
+  {
+    "id": 24,
+    "carrierId": 1,
+    "invoiceNumber": "INV-1650",
+    "weightLbs": 21000.00,
+    "amount": 7634.00,
+    "createdAt": "2026-11-11T02:59:49.468437+00:00"
+  },
+  {
+    "id": 25,
+    "carrierId": 2,
+    "invoiceNumber": "INV-1769",
+    "weightLbs": 15500.00,
+    "amount": 5538.00,
+    "createdAt": "2026-11-10T02:59:49.468437+00:00"
+  },
+  {
+    "id": 26,
+    "carrierId": 3,
+    "invoiceNumber": "INV-4270",
+    "weightLbs": 4300.00,
+    "amount": 1887.00,
+    "createdAt": "2026-11-11T02:59:49.468437+00:00"
+  },
+  {
+    "id": 27,
+    "carrierId": 5,
+    "invoiceNumber": "INV-6513",
+    "weightLbs": 22700.00,
+    "amount": 8274.00,
+    "createdAt": "2026-11-02T02:59:49.468437+00:00"
+  },
+  {
+    "id": 28,
+    "carrierId": 5,
+    "invoiceNumber": "INV-2297",
+    "weightLbs": 12600.00,
+    "amount": 4630.00,
+    "createdAt": "2026-10-20T01:59:49.468437+00:00"
+  },
+  {
+    "id": 29,
+    "carrierId": 1,
+    "invoiceNumber": "INV-5474",
+    "weightLbs": 20800.00,
+    "amount": 7558.00,
+    "createdAt": "2026-11-04T02:59:49.468437+00:00"
+  },
+  {
+    "id": 30,
+    "carrierId": 1,
+    "invoiceNumber": "INV-2672",
+    "weightLbs": 25400.00,
+    "amount": 9220.00,
+    "createdAt": "2026-11-02T02:59:49.468437+00:00"
+  },
+  {
+    "id": 31,
+    "carrierId": 1,
+    "invoiceNumber": "INV-9899",
+    "weightLbs": 23300.00,
+    "amount": 8589.00,
+    "createdAt": "2026-10-27T01:59:49.468437+00:00"
+  },
+  {
+    "id": 32,
+    "carrierId": 5,
+    "invoiceNumber": "INV-9219",
+    "weightLbs": 7300.00,
+    "amount": 2862.00,
+    "createdAt": "2026-11-05T02:59:49.468437+00:00"
+  },
+  {
+    "id": 33,
+    "carrierId": 2,
+    "invoiceNumber": "INV-2189",
+    "weightLbs": 22400.00,
+    "amount": 8266.00,
+    "createdAt": "2026-11-08T02:59:49.468437+00:00"
+  },
+  {
+    "id": 34,
+    "carrierId": 2,
+    "invoiceNumber": "INV-1001",
+    "weightLbs": 545.00,
+    "amount": 20.00,
+    "createdAt": "2026-11-18T03:42:56.388411+00:00"
+  },
+  {
+    "id": 35,
+    "carrierId": 1,
+    "invoiceNumber": "INV-1001",
+    "weightLbs": 1231.00,
+    "amount": 123.00,
+    "createdAt": "2026-11-18T04:45:16.131577+00:00"
+  }
+]

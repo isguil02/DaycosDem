@@ -344,6 +344,187 @@ app.MapPost("/invoices/seed", async (SeedInvoicesRequest request) =>
     }
 });
 
+// POST /system/backup: Snapshots all 4 tables into a timestamped backup folder
+app.MapPost("/system/backup", async () =>
+{
+    await using var conn = new NpgsqlConnection(connectionString);
+    await conn.OpenAsync();
+
+    var timestamp = DateTime.UtcNow.ToString("yyyyMMdd_HHmmss");
+    var backupFolder = Path.Combine("backups", $"backup_{timestamp}");
+    Directory.CreateDirectory(backupFolder);
+
+    // 1. Carriers
+    var carriers = new List<dynamic>();
+    await using (var cmd = new NpgsqlCommand("SELECT id, name, carrier_code, contact_phone FROM carriers;", conn))
+    await using (var r = await cmd.ExecuteReaderAsync())
+    {
+        while (await r.ReadAsync())
+        {
+            carriers.Add(new
+            {
+                id = r.GetInt32(0),
+                name = r.GetString(1),
+                carrierCode = r.GetString(2),
+                phone = r.IsDBNull(3) ? null : r.GetString(3)
+            });
+        }
+    }
+
+    // 2. Active Invoices
+    var invoices = new List<dynamic>();
+    await using (var cmd = new NpgsqlCommand("SELECT id, carrier_id, invoice_number, weight_lbs, amount, created_at FROM invoices;", conn))
+    await using (var r = await cmd.ExecuteReaderAsync())
+    {
+        while (await r.ReadAsync())
+        {
+            invoices.Add(new
+            {
+                id = r.GetInt32(0),
+                carrierId = r.GetInt32(1),
+                invoiceNumber = r.GetString(2),
+                weightLbs = r.GetDecimal(3),
+                amount = r.GetDecimal(4),
+                createdAt = r.GetFieldValue<DateTimeOffset>(5)
+            });
+        }
+    }
+
+    // 3. Deleted Carriers (Audit Archive)
+    var delCarriers = new List<dynamic>();
+    await using (var cmd = new NpgsqlCommand("SELECT id, name, contact_phone, deleted_at, deletion_reason FROM deleted_carriers;", conn))
+    await using (var r = await cmd.ExecuteReaderAsync())
+    {
+        while (await r.ReadAsync())
+        {
+            delCarriers.Add(new
+            {
+                id = r.IsDBNull(0) ? 0 : r.GetInt32(0),
+                name = r.IsDBNull(1) ? null : r.GetString(1),
+                phone = r.IsDBNull(2) ? null : r.GetString(2),
+                deletedAt = r.GetFieldValue<DateTimeOffset>(3),
+                reason = r.GetString(4)
+            });
+        }
+    }
+
+    // 4. Deleted Invoices (Audit Archive)
+    var delInvoices = new List<dynamic>();
+    await using (var cmd = new NpgsqlCommand("SELECT id, invoice_number, carrier_id, weight_lbs, amount, original_created_at, deleted_at, deletion_reason FROM deleted_invoices;", conn))
+    await using (var r = await cmd.ExecuteReaderAsync())
+    {
+        while (await r.ReadAsync())
+        {
+            delInvoices.Add(new
+            {
+                id = r.IsDBNull(0) ? 0 : r.GetInt32(0),
+                invoiceNumber = r.IsDBNull(1) ? null : r.GetString(1),
+                carrierId = r.IsDBNull(2) ? 0 : r.GetInt32(2),
+                weightLbs = r.IsDBNull(3) ? 0 : r.GetDecimal(3),
+                amount = r.IsDBNull(4) ? 0 : r.GetDecimal(4),
+                originalCreatedAt = r.IsDBNull(5) ? (DateTimeOffset?)null : r.GetFieldValue<DateTimeOffset>(5),
+                deletedAt = r.GetFieldValue<DateTimeOffset>(6),
+                reason = r.GetString(7)
+            });
+        }
+    }
+
+    var opt = new System.Text.Json.JsonSerializerOptions { WriteIndented = true };
+    await File.WriteAllTextAsync(Path.Combine(backupFolder, "carriers.json"), System.Text.Json.JsonSerializer.Serialize(carriers, opt));
+    await File.WriteAllTextAsync(Path.Combine(backupFolder, "invoices.json"), System.Text.Json.JsonSerializer.Serialize(invoices, opt));
+    await File.WriteAllTextAsync(Path.Combine(backupFolder, "deleted_carriers.json"), System.Text.Json.JsonSerializer.Serialize(delCarriers, opt));
+    await File.WriteAllTextAsync(Path.Combine(backupFolder, "deleted_invoices.json"), System.Text.Json.JsonSerializer.Serialize(delInvoices, opt));
+
+    return Results.Ok(new
+    {
+        backupFolder,
+        carriers = carriers.Count,
+        invoices = invoices.Count,
+        deletedCarriers = delCarriers.Count,
+        deletedInvoices = delInvoices.Count
+    });
+});
+
+// POST /system/nuke: Simulates the disaster (DELETE without WHERE)
+app.MapPost("/system/nuke", async () =>
+{
+    await using var conn = new NpgsqlConnection(connectionString);
+    await conn.OpenAsync();
+    await using var cmd = new NpgsqlCommand("DELETE FROM invoices;", conn);
+    await cmd.ExecuteNonQueryAsync();
+    return Results.Ok(new { message = "All invoices deleted from active ledger." });
+});
+
+// POST /system/restore-backup: Restores all 4 tables from the latest backup folder
+app.MapPost("/system/restore-backup", async (int? beforeMinutes) =>
+{
+    var backupRoot = "backups";
+    if (!Directory.Exists(backupRoot))
+        return Results.NotFound(new { message = "No backups directory found." });
+
+    var cutoff = beforeMinutes.HasValue ? DateTime.UtcNow.AddMinutes(-beforeMinutes.Value) : DateTime.UtcNow;
+
+    // Pick newest backup folder older than cutoff
+    var latestFolder = new DirectoryInfo(backupRoot)
+        .GetDirectories("backup_*")
+        .Where(d => d.LastWriteTimeUtc <= cutoff)
+        .OrderByDescending(d => d.LastWriteTimeUtc)
+        .FirstOrDefault();
+
+    if (latestFolder == null)
+        return Results.NotFound(new { message = "No valid backup folder found." });
+
+    var invPath = Path.Combine(latestFolder.FullName, "invoices.json");
+    if (!File.Exists(invPath))
+        return Results.BadRequest(new { message = "Corrupt backup: missing invoices.json." });
+
+    var json = await File.ReadAllTextAsync(invPath);
+    var doc = System.Text.Json.JsonDocument.Parse(json);
+    var invElements = doc.RootElement.EnumerateArray().ToList();
+
+    await using var conn = new NpgsqlConnection(connectionString);
+    await conn.OpenAsync();
+    await using var tx = await conn.BeginTransactionAsync();
+
+    try
+    {
+        // 1. Wipe active invoices
+        await using (var delCmd = new NpgsqlCommand("DELETE FROM invoices;", conn, tx))
+        {
+            await delCmd.ExecuteNonQueryAsync();
+        }
+
+        // 2. Restore active invoices
+        foreach (var el in invElements)
+        {
+            var insSql = """
+                INSERT INTO invoices (carrier_id, invoice_number, weight_lbs, amount, created_at)
+                VALUES (@cId, @invNum, @weight, @amount, @createdAt);
+            """;
+            await using var iCmd = new NpgsqlCommand(insSql, conn, tx);
+            iCmd.Parameters.AddWithValue("cId", el.GetProperty("carrierId").GetInt32());
+            iCmd.Parameters.AddWithValue("invNum", el.GetProperty("invoiceNumber").GetString());
+            iCmd.Parameters.AddWithValue("weight", el.GetProperty("weightLbs").GetDecimal());
+            iCmd.Parameters.AddWithValue("amount", el.GetProperty("amount").GetDecimal());
+            iCmd.Parameters.AddWithValue("createdAt", DateTimeOffset.Parse(el.GetProperty("createdAt").GetString()));
+            await iCmd.ExecuteNonQueryAsync();
+        }
+
+        await tx.CommitAsync();
+        return Results.Ok(new
+        {
+            restoredFolder = latestFolder.Name,
+            invoicesRestored = invElements.Count,
+            message = $"Successfully restored {invElements.Count} invoices from snapshot {latestFolder.Name}."
+        });
+    }
+    catch (Exception ex)
+    {
+        await tx.RollbackAsync();
+        return Results.Problem($"Restore failed: {ex.Message}");
+    }
+});
+
 app.Run();
 
 public record Invoice(
